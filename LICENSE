@@ -1,3 +1,37 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2026 S.G.Johansson (LunAlpha Team)
+
+Everyone is permitted to copy and distribute verbatim copies
+of this license document, but changing it is not allowed.
+
+===============================================================================
+ADDITIONAL TERMS & LUNA_HUD USAGE POLICY (Section 7)
+===============================================================================
+
+In accordance with Section 7 of the GNU GPLv3, the following additional 
+restrictions and permissions apply to the LunAlpha HUD (LunaHUD) project:
+
+1. NON-COMMERCIAL USE: This software, its source code, and any derivative 
+   works MAY NOT be sold, licensed for a fee, or placed behind any form 
+   of paywall (including but not limited to Patreon, early-access fees, 
+   or ad-shorteners). 
+
+2. BRAND & NAME PROTECTION: You may NOT redistribute this software, or 
+   modified versions of it, under the names "LunaHUD", "LunAlpha HUD", 
+   "LunAlpha", or any name that implies an official release by S.G.Johansson.
+
+3. FORKS & DERIVATIVES: Any redistribution of modified versions of this 
+   source code MUST use a distinctively different name to avoid 
+   confusion with the original project. 
+
+4. MANDATORY ATTRIBUTION: Any project using code from this repository 
+   MUST provide clear, visible credit to S.G.Johansson and include a 
+   link to the original source: github.com/[DITT-NAMN]/LunaHUD.
+
+===============================================================================
+
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 

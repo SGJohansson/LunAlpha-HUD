@@ -39,3 +39,8 @@ luac.out
 *.x86_64
 *.hex
 
+# Added to avoid updating work in progress
+git add .
+git commit -m "Initial commit: LunAlpha HUD Architect V1.0.1 with cross-platform support"
+git branch -M main
+git push -u origin main

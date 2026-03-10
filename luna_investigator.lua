@@ -1,18 +1,20 @@
-log("[LunaHUD] [SYSTEM] Security & Crossplay Investigator (V14.0)")
+log("[LunaHUD] [SYSTEM] Security & Crossplay Investigator (V14.7 - Crash Fix & Vanilla Sync)")
 if not _G.LunaHUD then _G.LunaHUD = {} end
 
--- [ID: INVESTIGATOR_V14.0_HARD_JAIL] --
--- [[ LUNALPHA INVESTIGATOR v14.0 ]]
+-- [ID: INVESTIGATOR_V14.7_STABLE] --
+-- [[ LUNALPHA INVESTIGATOR v14.7 ]]
 --
--- [ CHANGELOG V14.0 ]
--- + Hard Jail: Lade till !arrest (!jail, !mute) för att tvinga fram handfängsel på griefers via RPC.
--- + Host Authority: !mark (!cheater) finns kvar.
--- + Crossplay Support: Detekterar Steam vs Epic IDs.
+-- [ CHANGELOG V14.7 ]
+-- + Crash Fix: Tog bort anrop till obefintlig banned_list-metod i Vanilla Sync.
+-- + Blind Fire Unban: Skjuter nu in både ID som string och number mot spelets motor för 100% träff.
+-- + Data Unification: process_peers och !ban använder nu ett enhetligt Account ID för båda databaserna.
+-- + Quick Unban: !unban utan argument tar nu automatiskt bort den senast bannade spelaren.
+-- + Smart Aimbot Filter: Ignorerar nu automatiskt hagelgevär/explosiva vapen.
 
 _G.LunaInvestigator = _G.LunaInvestigator or {
     last_snap_t = 0,
     cooldown = 2,
-    last_banned_id = nil,
+    last_banned_id = nil, -- Quick Unban memory
     spam_tracker = {}, 
     join_timers = {},  
     blacklist_keywords = {
@@ -69,8 +71,12 @@ function LunaInvestigator:load_db()
     if file then
         local content = file:read("*all")
         file:close()
-        local decoded = (content and content ~= "") and json.decode(content)
-        if type(decoded) == "table" then db = decoded end
+        if content and content ~= "" then
+            local success, decoded = pcall(json.decode, content)
+            if success and type(decoded) == "table" then 
+                db = decoded 
+            end
+        end
     end
     return db
 end
@@ -143,6 +149,29 @@ function LunaInvestigator:get_accuracy(peer)
     return acc, shots
 end
 
+function LunaInvestigator:is_multihit_equipped(peer)
+    if not peer or not peer:blackmarket_outfit() then return true end -- Fail safe
+    local outfit = peer:blackmarket_outfit()
+    
+    local function check_weapon(w_data)
+        if not w_data or not w_data.factory_id then return false end
+        local w_id = managers.weapon_factory:get_weapon_id_by_factory_id(w_data.factory_id)
+        if not w_id then return false end
+        
+        local w_tweak = tweak_data.weapon[w_id]
+        if not w_tweak or not w_tweak.categories then return false end
+        
+        for _, cat in ipairs(w_tweak.categories) do
+            if cat == "shotgun" or cat == "grenade_launcher" or cat == "flamethrower" or cat == "bow" or cat == "crossbow" then
+                return true
+            end
+        end
+        return false
+    end
+    
+    return check_weapon(outfit.primary) or check_weapon(outfit.secondary)
+end
+
 function LunaInvestigator:check_dlc_integrity(peer)
     if not peer or not peer.outfit then return false end
     local outfit = peer:outfit()
@@ -176,9 +205,11 @@ function LunaInvestigator:process_peers(mode, target_peer)
                 -- Drop
             else
                 local name = peer:name()
-                local user_id = tostring(peer:user_id())
+                -- Enhetlig ID identifierare för JSON och Vanilla
+                local account_id_raw = peer:account_id() or peer:user_id()
+                local acc_id_str = tostring(account_id_raw)
 
-                if db[user_id] then
+                if db[acc_id_str] then
                     self:announce("ALERT: Banned player detected: " .. name, true)
                     self:force_kick(peer, id)
                     kick_performed = true
@@ -194,8 +225,14 @@ function LunaInvestigator:process_peers(mode, target_peer)
                     end
                 end
 
-                local acc, _ = self:get_accuracy(peer)
-                if acc and acc >= 99 then table.insert(dirty_reasons, "Aimbot (" .. acc .. "%)") end
+                -- SMART AIMBOT FILTER
+                local acc, shots = self:get_accuracy(peer)
+                if acc and shots > 50 then
+                    local is_multi = self:is_multihit_equipped(peer)
+                    if not is_multi and acc >= 90 then
+                        table.insert(dirty_reasons, "Aimbot (" .. acc .. "% on " .. shots .. " shots)")
+                    end
+                end
 
                 if peer.skills then
                     local skill_res = peer:skills()
@@ -205,26 +242,39 @@ function LunaInvestigator:process_peers(mode, target_peer)
                     end
                 end
 
+                -- DLC FIX
                 local dlc_cheat, item = self:check_dlc_integrity(peer)
-                if dlc_cheat then table.insert(dirty_reasons, "DLC Unlocker (" .. item .. ")") end
+                if dlc_cheat then table.insert(dirty_reasons, "DLC Unlocker (" .. tostring(item) .. ")") end
 
+                -- ABSOLUTE BAN LOGIC
                 if #dirty_reasons > 0 then
                     local reason_str = table.concat(dirty_reasons, ", ")
+                    
                     if mode == "out" then
                         self:announce("FLAGGED: " .. name .. " | " .. reason_str, true)
-                    elseif mode == "kick" then
-                        local plat_name, plat_link = self:get_platform_info(user_id)
-                        db[user_id] = { 
-                            name = name, 
-                            reason = reason_str, 
-                            date = os.date("%Y-%m-%d"),
-                            url = plat_link
-                        }
-                        self:save_db(db)
-                        self:announce("KICKING: " .. name .. " (" .. reason_str .. ")", true)
-                        self:force_kick(peer, id)
-                        kick_performed = true 
                     end
+                    
+                    local plat_name, plat_link = self:get_platform_info(acc_id_str)
+                    db[acc_id_str] = { 
+                        name = name, 
+                        reason = reason_str, 
+                        date = os.date("%Y-%m-%d"),
+                        url = plat_link
+                    }
+                    -- SPARA TILL QUICK UNBAN MEMORY
+                    self.last_banned_id = acc_id_str
+                    self:save_db(db)
+
+                    -- VANILLA SYNC
+                    if managers.ban_list and account_id_raw then
+                        managers.ban_list:ban(account_id_raw, name)
+                        managers.savefile:save_setting(true)
+                    end
+
+                    self:announce("KICKING: " .. name .. " (" .. reason_str .. ")", true)
+                    self:force_kick(peer, id)
+                    kick_performed = true 
+                    
                 elseif mode == "out" then
                      self:local_feedback("["..id.."] " .. name .. ": Clean.")
                 end
@@ -292,14 +342,13 @@ end
 -- [[ AUTO SCAN HOOK ]]
 if _G.UnitNetworkHandler then
     Hooks:PostHook(UnitNetworkHandler, "set_unit", "Luna_Auto_Scan_Hook", function(self, unit, char, outfit, out_id, peer_id)
-        -- DÖRRVAKTEN FÖR AUTO-INVESTIGATE: Avbryt direkt om funktionen är avstängd i Mod Options
         if _G.LunaHUD and _G.LunaHUD.settings and _G.LunaHUD.settings.auto_investigate == false then 
             return 
         end
 
         if peer_id and managers.network:session() then
             if not LunaInvestigator.join_timers[peer_id] then LunaInvestigator.join_timers[peer_id] = Application:time() end
-            DelayedCalls:Add("Luna_AutoScan_" .. tostring(peer_id), 3.0, function()
+            DelayedCalls:Add("Luna_AutoScan_" .. tostring(peer_id), 8.0, function()
                 local p = managers.network:session():peer(peer_id)
                 if p then LunaInvestigator:process_peers("silent", p) end
             end)
@@ -351,39 +400,39 @@ if not _G.LunaCommandHooked then
             end
 
             if hud and hud.panel then scan(hud.panel, "HUD_Root") end
-        end,
+        end
 
-        ["stats"] = function(msg)
+        ,["stats"] = function(msg)
             if _G.LunaHUD and _G.LunaHUD.settings then
                 _G.LunaHUD.settings.show_stats = not _G.LunaHUD.settings.show_stats
                 _G.LunaHUD:SaveSettings()
                 local status = _G.LunaHUD.settings.show_stats and "ON" or "OFF"
                 LunaInvestigator:local_feedback("Combat Stats Feed: " .. status)
             end
-        end,
-        
-        ["quit"] = function(msg)
+        end
+
+        ,["quit"] = function(msg)
             LunaInvestigator:local_feedback("Exiting game...")
             setup:quit()
-        end,
+        end
 
-        ["spawn"] = function(msg)
+        ,["spawn"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             managers.network:session():spawn_players()
             LunaInvestigator:local_feedback("Forced spawn on all waiting players.")
-        end,
+        end
 
-        ["restart"] = function(msg)
+        ,["restart"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             LunaInvestigator:local_feedback("Restarting game...")
             if managers.game_play_central then
                 managers.game_play_central:restart_the_game() 
             end
-        end,
+        end
 
-        ["list"] = function(msg) PrintPeerList() end,
+        ,["list"] = function(msg) PrintPeerList() end
 
-        ["debug"] = function(msg)
+        ,["debug"] = function(msg)
             local target_id = msg:match(" (%d+)")
             if target_id then
                 local peer = GetPeer(target_id)
@@ -405,9 +454,9 @@ if not _G.LunaCommandHooked then
             else
                 PrintPeerList()
             end
-        end,
+        end
 
-        ["mods"] = function(msg)
+        ,["mods"] = function(msg)
             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !mods <id>") return end
             local peer = GetPeer(target_id)
@@ -422,9 +471,9 @@ if not _G.LunaCommandHooked then
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
-        end,
+        end
 
-        ["kick"] = function(msg)
+        ,["kick"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !kick <id>") return end
@@ -435,32 +484,43 @@ if not _G.LunaCommandHooked then
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
-        end,
+        end
 
-        ["ban"] = function(msg)
+        ,["ban"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !ban <id>") return end
             local peer = GetPeer(target_id)
             if peer then
-                local user_id = tostring(peer:user_id())
+                local account_id_raw = peer:account_id() or peer:user_id()
+                local acc_id_str = tostring(account_id_raw)
                 local db = LunaInvestigator:load_db()
-                local _, plat_link = LunaInvestigator:get_platform_info(user_id)
-                db[user_id] = { 
+                local _, plat_link = LunaInvestigator:get_platform_info(acc_id_str)
+                db[acc_id_str] = { 
                     name = peer:name(), 
                     reason = "Manual Ban", 
                     date = os.date("%Y-%m-%d"),
                     url = plat_link
                 }
+                
+                -- SPARA TILL QUICK UNBAN MEMORY
+                LunaInvestigator.last_banned_id = acc_id_str
                 LunaInvestigator:save_db(db)
+                
+                -- VANILLA SYNC
+                if managers.ban_list and account_id_raw then
+                    managers.ban_list:ban(account_id_raw, peer:name())
+                    managers.savefile:save_setting(true)
+                end
+
                 LunaInvestigator:announce("Banning " .. peer:name() .. "...", true)
                 LunaInvestigator:force_kick(peer, tonumber(target_id))
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
-        end,
-        
-        ["mark"] = function(msg)
+        end
+
+        ,["mark"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !mark <id>") return end
@@ -471,10 +531,9 @@ if not _G.LunaCommandHooked then
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
-        end,
+        end
 
-        -- [ NY FUNKTION: HARD JAIL ]
-        ["arrest"] = function(msg)
+        ,["arrest"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !arrest <id>") return end
@@ -483,7 +542,6 @@ if not _G.LunaCommandHooked then
             if peer then
                 if alive(peer:unit()) then
                     local unit = peer:unit()
-                    -- Tvinga över rörelsetillståndet "arrested" (handfängslad) över nätverket
                     managers.network:session():send_to_peers_synched("sync_player_movement_state", unit, "arrested", 0, unit:id())
                     peer:send("sync_player_movement_state", unit, "arrested", 0, unit:id())
                     LunaInvestigator:announce("JAIL: " .. peer:name() .. " has been handcuffed.", true)
@@ -493,41 +551,79 @@ if not _G.LunaCommandHooked then
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
-        end,
+        end
 
-        ["ssl"] = function(msg)
+        ,["ssl"] = function(msg)
             LunaInvestigator:announce("Scanning peers...", false)
             LunaInvestigator:process_peers("out")
             LunaInvestigator:run_snapshot(true)
-        end,
+        end
 
-        ["log"] = function(msg) LunaInvestigator:run_snapshot(false) end,
+        ,["log"] = function(msg) LunaInvestigator:run_snapshot(false) end
 
-        ["kickcheck"] = function(msg)
+        ,["kickcheck"] = function(msg)
             if Network:is_server() then 
                 LunaInvestigator:process_peers("kick") 
             else
                 LunaInvestigator:local_feedback("Error: Host only.")
             end
-        end,
+        end
 
-        ["unban"] = function(msg)
-            local t = msg:gsub("!unban ", "")
+        -- [ KRASCHSÄKER VANILLA UNBAN ]
+        ,["unban"] = function(msg)
+            local t = string.sub(msg, 8)
+            t = t and t:match("^%s*(.-)%s*$") or "" 
+            
             local db = LunaInvestigator:load_db()
             local found = false
-            for id, d in pairs(db) do
-                if id == t or (type(d) == "table" and d.name and d.name:lower() == t:lower()) then
-                    db[id] = nil
+
+            if t == "" then
+                if LunaInvestigator.last_banned_id and db[LunaInvestigator.last_banned_id] then
+                    t = LunaInvestigator.last_banned_id
+                else
+                    LunaInvestigator:local_feedback("No recent bans in memory. Usage: !unban <name or id>")
+                    return
+                end
+            end
+            
+            local search_t = t:lower()
+            
+            for json_account_id, data in pairs(db) do
+                if json_account_id:lower() == search_t or (type(data) == "table" and data.name and data.name:lower():find(search_t, 1, true)) then
+                    
+                    local unbanned_name = type(data) == "table" and data.name or json_account_id
+                    db[json_account_id] = nil
                     LunaInvestigator:save_db(db)
-                    LunaInvestigator:announce("Unbanned: " .. id, false)
+                    
+                    -- VANILLA SYNC: Skjut blint på både string och number för att undvika PD2-krascher
+                    if managers.ban_list then
+                        managers.ban_list:unban(json_account_id)
+                        
+                        local num_id = tonumber(json_account_id)
+                        if num_id then
+                            managers.ban_list:unban(num_id)
+                        end
+                        
+                        managers.savefile:save_setting(true)
+                    end
+
+                    LunaInvestigator:announce("Unbanned: " .. unbanned_name, false)
+                    
+                    if LunaInvestigator.last_banned_id == json_account_id then
+                        LunaInvestigator.last_banned_id = nil
+                    end
+                    
                     found = true
                     break
                 end
             end
-            if not found then LunaInvestigator:local_feedback("User not found in ban list.") end
-        end,
+            
+            if not found then 
+                LunaInvestigator:local_feedback("User '".. t .."' not found in ban list.") 
+            end
+        end
 
-        ["readyup"] = function(msg)
+        ,["readyup"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             local waiting = {}
             local count = 0
@@ -588,4 +684,4 @@ if not _G.LunaCommandHooked then
         return orig_send_message(self, channel_id, sender, message)
     end
 end
--- [END_ID: INVESTIGATOR_V14.0_HARD_JAIL] --
+-- [END_ID: INVESTIGATOR_V14.7_STABLE] --

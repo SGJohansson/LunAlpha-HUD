@@ -1,4 +1,4 @@
-log("[LunaHUD] [UI] Configuration Menu Loaded (V12 - Tactical Toggles)")
+log("[LunaHUD] [UI] Configuration Menu Loaded (V13.1 - ModPath Sync & Thanks)")
 if not _G.LunaHUD then _G.LunaHUD = {} end
 
 _G.LunaMenu = _G.LunaMenu or {}
@@ -6,7 +6,7 @@ LunaHUD_ModPath = ModPath
 
 -- 1. DEFINIERA TEXTER
 Hooks:Add("LocalizationManagerPostInit", "LunaMenu_Loc", function(loc)
-    local SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n" 
+    local SPACER = "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n" 
 
     loc:add_localized_strings({
         ["luna_main_title"] = "LunAlpha HUD",
@@ -63,7 +63,17 @@ Hooks:Add("LocalizationManagerPostInit", "LunaMenu_Loc", function(loc)
                              "ARCH    : LunAlpha Architecture\n" ..
                              "VERSION : 96.0 (Strict Auto-Coder)\n" ..
                              "LICENSE : GPLv3 (2025-2026)\n\n" ..
-                             "\"Trust no one but the code.\""
+                             "\"Trust no one but the code.\"",
+                             
+        -- NY: SPECIAL THANKS
+        ["luna_thanks_title"] = "SPECIAL THANKS",
+        ["luna_thanks_desc"] = SPACER ..
+                               "--- DEDICATED TO ---\n" ..
+                               "My wife Maria\n\n" ..
+                               "--- SPECIAL THANKS ---\n" ..
+                               "VAS - Beta testing from the very start\n" ..
+                               "Wolflordjake - Gave valuable advice and suggestions\n" ..
+                               "GG - Assisting with code debugging"
     })
 end)
 
@@ -115,7 +125,8 @@ Hooks:Add("MenuManagerPopulateCustomMenus", "LunaMenu_Populate", function(menu_m
 
     MenuCallbackHandler.Luna_WipeBlacklist = function(self, item)
         local function wipe_now()
-            local path = SavePath .. "luna_blacklist.json"
+            -- KORRIGERAD SÖKVÄG: Använder ModPath för att matcha luna_investigate.lua
+            local path = LunaHUD_ModPath .. "luna_blacklist.json"
             local file = io.open(path, "w+")
             if file then
                 file:write("{}")
@@ -208,12 +219,19 @@ Hooks:Add("MenuManagerPopulateCustomMenus", "LunaMenu_Populate", function(menu_m
     MenuHelper:AddButton({
         id = "luna_sec", title = "luna_sec_title", desc = "luna_sec_desc",
         callback = "Luna_EmptyCallback",
-        menu_id = "luna_hud_menu", priority = 2
+        menu_id = "luna_hud_menu", priority = 3
     })
 
     -- 10. Credits
     MenuHelper:AddButton({
         id = "luna_cred", title = "luna_cred_title", desc = "luna_cred_desc",
+        callback = "Luna_EmptyCallback",
+        menu_id = "luna_hud_menu", priority = 2
+    })
+    
+    -- 11. Special Thanks (NY)
+    MenuHelper:AddButton({
+        id = "luna_thanks", title = "luna_thanks_title", desc = "luna_thanks_desc",
         callback = "Luna_EmptyCallback",
         menu_id = "luna_hud_menu", priority = 1
     })

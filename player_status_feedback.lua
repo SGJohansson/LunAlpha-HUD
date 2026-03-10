@@ -1,7 +1,7 @@
-log("[LunaHUD] [COMBAT] Ability & Buff Status")
+log("[LunaHUD] [COMBAT] Ability & Buff Status (V2.4 - Strict Filter)")
 if not _G.LunaHUD then _G.LunaHUD = {} end
 
--- [[ LunaHUD: Player Status Feedback V2.3 - Ghost Filter Edition ]]
+-- [[ LunaHUD: Player Status Feedback V2.4 - Ghost Filter Edition ]]
 
 _G.LunaStatus = _G.LunaStatus or {
     _workspace = nil,
@@ -39,7 +39,14 @@ function LunaStatus:GetSmartX(base_x)
     return new_x
 end
 
+-- CENTRAL RIT-FUNKTION
 function LunaStatus:ShowStatus(amount, type)
+    -- DÖRRVAKTEN: Döda funktionen direkt om Damage Popups är AV i menyn.
+    -- Detta fångar alla anrop oavsett vilken fil som skickar dem.
+    if _G.LunaHUD and _G.LunaHUD.settings and _G.LunaHUD.settings.show_dmgpop == false then 
+        return 
+    end
+
     if not amount or amount <= 0 then return end
     
     local now = TimerManager:game():time()
@@ -95,6 +102,7 @@ function LunaStatus:ShowStatus(amount, type)
     end)
 end
 
+-- HOOKS
 if _G.PlayerDamage then
     Hooks:PostHook(PlayerDamage, "restore_health", "LunaStatus_Health", function(self, amount)
         LunaStatus:ShowStatus(amount * 10, "health")
@@ -103,4 +111,3 @@ if _G.PlayerDamage then
         LunaStatus:ShowStatus(amount * 10, "armor")
     end)
 end
-

@@ -1,14 +1,37 @@
 log("[LunaHUD] [CORE] System Kernel Active")
 if not _G.LunaHUD then _G.LunaHUD = {} end
 
--- [[ LunAlpha HUD: Core Firewall V8.0 - Safe House Shield ]]
+-- [[ LunAlpha HUD: Environment Setup ]]
+-- ModPath är en inbyggd SuperBLT-global som pekar på din mod-mapp
+LunaHUD.mod_path = ModPath
+LunaHUD.logs_path = LunaHUD.mod_path .. "logs/"
+LunaHUD.blacklist_path = LunaHUD.mod_path .. "luna_blacklist.json"
 
---local old_set_unit = UnitNetworkHandler.set_unit
---function UnitNetworkHandler:set_unit(unit, character_name, outfit_string, outlier_id, peer_id, ...)
---    -- Tvinga Dallas i Safe House för att spara minne och slippa asset-krascher
---   local level_id = managers.job:current_level_id()
---    if level_id == "chill_ri" or level_id == "chill" or (outfit_string and #outfit_string > 300) then
---        outfit_string = "dallas"
---    end
---    return old_set_unit(self, unit, character_name, outfit_string, outlier_id, peer_id, ...)
---end
+-- Ensure Directory Structure
+-- Vi använder Application:nice_path för att konvertera till rätt OS-format (Windows/Linux)
+function LunaHUD:setup_filesystem()
+    -- Kontrollera och skapa logs-mappen
+    local nice_logs = Application:nice_path(self.logs_path, true)
+    if not SystemFS:exists(nice_logs) then
+        SystemFS:make_dir(nice_logs)
+        log("[LunaHUD] [CORE] Created missing logs directory at: " .. nice_logs)
+    end
+
+    -- Kontrollera och skapa en tom blacklist.json
+    local nice_blacklist = Application:nice_path(self.blacklist_path, false)
+    if not io.file_is_readable(nice_blacklist) then
+        local file = io.open(nice_blacklist, "w")
+        if file then
+            file:write("{}") -- Viktigt: En tom JSON-tabell för att Investigator inte ska krascha
+            file:close()
+            log("[LunaHUD] [CORE] Initialized empty luna_blacklist.json")
+        else
+            log("[LunaHUD] [ERROR] Could not create blacklist file!")
+        end
+    end
+end
+
+-- Exekvera setup omedelbart vid laddning
+LunaHUD:setup_filesystem()
+
+-- [[ LunAlpha HUD: Core Firewall V8.0 - Safe House Shield ]]

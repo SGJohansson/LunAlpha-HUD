@@ -12,14 +12,14 @@ Every UI element is engineered to reduce cognitive load: players focus on the he
 <br>
 <br>
 
-## 🎯 The Minimalism Philosophy
+## The Minimalism Philosophy
 Unlike stripped-down HUDs that sacrifice functionality, LunAlpha delivers essential tactical data cleanly:
 * **Contextual Awareness**: Non-intrusive panels that activate only when relevant to your current state.
 * **Visual Clarity**: Aggressive filtering of intrusive engine effects like bloom and chromatic aberration to improve target acquisition.
 * **Spatial Optimization**: Elements are positioned to maximize screen real estate, perfectly adapted for standard, ultrawide, and high-refresh-rate setups (144Hz+).
 <br>
 
-## ⚡ Performance-First Architecture
+## Performance-First Architecture
 * **Event-Driven Updates**: Elements only refresh when the game state changes, eliminating unnecessary frame-by-frame polling.
 * **LunaCore Kernel**: A centralized lifecycle manager that prevents hook conflicts and ensures engine-level stability.
 * **Zero-Impact Logic**: Optimized Lua backend designed to preserve FPS even during high-intensity police assaults.
@@ -27,20 +27,20 @@ Unlike stripped-down HUDs that sacrifice functionality, LunAlpha delivers essent
 <br>
 <br>
 
-## ✨ Key Modules
+## Key Modules
 
-### 🛡 The Investigator (v3.0)
+### The Investigator (v3.0)
 Advanced security suite for proactive lobby management. 
 * **Peer Validation**: Real-time scanning for cheated skill points (e.g., 644-builds) and invalid equipment.
 * **Mod Blacklisting**: Cross-references peer mod lists to flag known cheat-mods and griefing tools.
 * **Automated Logging**: Comprehensive session logging for administrative review.
 
-### 🧪 CleanCooker
+### CleanCooker
 Specialized module for chemical-based heists (e.g., Cook Off).
 * Provides clear, non-intrusive ingredient prompts.
 * Synchronizes state data between host and clients to prevent "wrong ingredient" desync errors.
 
-### ⚔️ Combat & Feedback
+###  Combat & Feedback
 * **Buff & Cooldown Tracking**: Consolidated real-time monitoring of perk deck procs and skill durations.
 * **Joker Management**: Dedicated tracking for converted enemies, including health scaling and active status.
 * **Smart Crosshair**: A precision-focused system for instant hit confirmation without visual bloat.
@@ -58,6 +58,6 @@ Licensed under **GNU GPLv3** with mandatory additional terms under Section 7:
 
 ---
 
-## 📦 Installation
+## Installation
 1.  Requirement: [SuperBLT](https://superblt.znix.xyz/)
 2.  Download this repository and place the `LunAlpha_MinimalHUD` folder into your `PAYDAY 2/mods/` directory.

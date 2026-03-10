@@ -2,7 +2,7 @@
     "name": "LunAlpha HUD",
     "description": "Lightweight, distraction-free HUD. Optimized for player and hardware performance! Support automated GitHub updates.",
     "author": "S.G.Johansson, LunAlpha Team",
-    "version": "2.9.3",
+    "version": "2.9.4",
     "image": "lunahud.png",
     "contact": "GitHub",
     "updates": [

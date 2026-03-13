@@ -1,20 +1,40 @@
-log("[LunaHUD] [SYSTEM] Security & Crossplay Investigator (V14.7 - Crash Fix & Vanilla Sync)")
+log("[LunaHUD] [SYSTEM] Security & Crossplay Investigator (V14.8 - Smart Info & Navigation)")
 if not _G.LunaHUD then _G.LunaHUD = {} end
 
--- [ID: INVESTIGATOR_V14.7_STABLE] --
--- [[ LUNALPHA INVESTIGATOR v14.7 ]]
+-- ==============================================================================
+-- [[ LUNALPHA HUD: KOMMANDOREFERENS (INVESTIGATOR) ]]
+-- ==============================================================================
+-- NÄTVERK & SPELARE
+-- !list           : Listar alla aktiva spelare och deras ID.
+-- !info <id>      : Visar spelarens Build, Stats och Mods lokalt i chatten (ignorerar tom data).
+-- !debug <id>     : Visar teknisk data och SuperBLT-version lokalt.
+-- !mods <id>      : Visar endast en spelares mod-lista.
 --
--- [ CHANGELOG V14.7 ]
--- + Crash Fix: Tog bort anrop till obefintlig banned_list-metod i Vanilla Sync.
--- + Blind Fire Unban: Skjuter nu in både ID som string och number mot spelets motor för 100% träff.
--- + Data Unification: process_peers och !ban använder nu ett enhetligt Account ID för båda databaserna.
--- + Quick Unban: !unban utan argument tar nu automatiskt bort den senast bannade spelaren.
--- + Smart Aimbot Filter: Ignorerar nu automatiskt hagelgevär/explosiva vapen.
+-- SÄKERHET & KICK (Kräver Host)
+-- !kickcheck      : Genomsöker lobbyn automatiskt efter fuskare.
+-- !ssl            : Utför en djupgående säkerhetsskanning av alla.
+-- !kick <id>      : Sparkar en specifik spelare (Alias: !k).
+-- !ban <id>       : Sparkar, lägger till i Luna Blacklist och Vanilla Banlist (Alias: !b).
+-- !unban <id>     : Tar bort en spelare från båda banlistorna. (!unban utan ID tar senaste).
+-- !mark <id>      : Flaggar en spelare som "Cheater" (Röd text).
+-- !arrest <id>    : Sätter handfängsel på en spelare i spelet (Alias: !jail, !mute).
+--
+-- VERKTYG & NAVIGATION
+-- !log            : Skapar en ögonblicksbild av lobbyn och sparar i 'logs/'.
+-- !readme         : Öppnar den lokala LunAlpha-manualen i Steams webbläsare.
+-- !leave          : Avbryter heisten och återgår till huvudmenyn omedelbart.
+-- !quit           : Stänger ner spelet helt (Alias: !q, !exit).
+-- !spawn          : Tvingar fram spawn på spelare som fastnat i laddning (Alias: !s, !load).
+-- !restart        : Startar om nuvarande bana (Alias: !r).
+-- !readyup        : Påminner lokalt om vilka spelare som inte tryckt Ready.
+-- !ghost          : Felsökningsverktyg som hittar dolda HUD-element.
+-- !stats          : Togglar din lokala combat-stats feed.
+-- ==============================================================================
 
 _G.LunaInvestigator = _G.LunaInvestigator or {
     last_snap_t = 0,
     cooldown = 2,
-    last_banned_id = nil, -- Quick Unban memory
+    last_banned_id = nil,
     spam_tracker = {}, 
     join_timers = {},  
     blacklist_keywords = {
@@ -150,7 +170,7 @@ function LunaInvestigator:get_accuracy(peer)
 end
 
 function LunaInvestigator:is_multihit_equipped(peer)
-    if not peer or not peer:blackmarket_outfit() then return true end -- Fail safe
+    if not peer or not peer:blackmarket_outfit() then return true end 
     local outfit = peer:blackmarket_outfit()
     
     local function check_weapon(w_data)
@@ -205,7 +225,6 @@ function LunaInvestigator:process_peers(mode, target_peer)
                 -- Drop
             else
                 local name = peer:name()
-                -- Enhetlig ID identifierare för JSON och Vanilla
                 local account_id_raw = peer:account_id() or peer:user_id()
                 local acc_id_str = tostring(account_id_raw)
 
@@ -415,6 +434,32 @@ if not _G.LunaCommandHooked then
             LunaInvestigator:local_feedback("Exiting game...")
             setup:quit()
         end
+        
+        -- NY: LEAVE COMMAND
+        ,["leave"] = function(msg)
+            LunaInvestigator:local_feedback("Leaving to Main Menu...")
+            if managers.network and managers.network.matchmake then
+                managers.network.matchmake:leave_game()
+            end
+            setup:return_to_main_menu()
+        end
+        
+-- NY: MANUAL VIA OVERLAY (ONLINE)
+        ,["readme"] = function(msg)
+            if Steam and Steam:overlay_enabled() then
+                -- Omgår Steam Overlays problem med lokala filsökvägar och mellanslag.
+                -- Använd antingen GitHub-direktlänk eller din Netlify-domän.
+                local url = "https://htmlpreview.github.io/?https://github.com/SGJohansson/LunAlpha-HUD/blob/main/README.html"
+                
+                -- Om du laddar upp den till din hemsida istället, använd denna:
+                -- local url = "https://lunalpha-hud.netlify.app/README.html"
+
+                Steam:overlay_activate("url", url)
+                LunaInvestigator:local_feedback("Opening Online Manual...")
+            else
+                LunaInvestigator:local_feedback("Error: Steam Overlay is disabled.")
+            end
+        end
 
         ,["spawn"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
@@ -472,6 +517,38 @@ if not _G.LunaCommandHooked then
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
         end
+        
+        -- NY: INFO (Kombinerad data, tyst filtrering)
+        ,["info"] = function(msg)
+            local target_id = msg:match(" (%d+)")
+            if not target_id then LunaInvestigator:local_feedback("Usage: !info <id>") return end
+            local peer = GetPeer(target_id)
+            if peer then
+                LunaInvestigator:local_feedback("=== INFO: " .. peer:name() .. " ===")
+                
+                -- Build Data
+                local s_str = peer.skills and peer:skills() or ""
+                local perk, pts = LunaInvestigator:interpret_build(s_str)
+                if pts > 0 then
+                    LunaInvestigator:local_feedback(string.format("Build: %s (%d pts)", perk, pts))
+                end
+                
+                -- Stats Data
+                local acc, shots = LunaInvestigator:get_accuracy(peer)
+                if shots > 0 then
+                    LunaInvestigator:local_feedback(string.format("Accuracy: %d%% (%d shots)", acc, shots))
+                end
+                
+                -- Mods Data
+                local mods = peer:synced_mods() or {}
+                if #mods > 0 then
+                    LunaInvestigator:local_feedback("Mods:")
+                    for _, m in ipairs(mods) do LunaInvestigator:local_feedback(" - " .. tostring(m.name)) end
+                end
+            else
+                LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
+            end
+        end
 
         ,["kick"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
@@ -480,7 +557,7 @@ if not _G.LunaCommandHooked then
             local peer = GetPeer(target_id)
             if peer then
                 LunaInvestigator:announce("Kicking " .. peer:name() .. "...", true)
-                LunaInvestigator:force_kick(peer, tonumber(target_id))
+                 LunaInvestigator:force_kick(peer, tonumber(target_id))
             else
                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
@@ -488,7 +565,7 @@ if not _G.LunaCommandHooked then
 
         ,["ban"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
-            local target_id = msg:match(" (%d+)")
+             local target_id = msg:match(" (%d+)")
             if not target_id then LunaInvestigator:local_feedback("Usage: !ban <id>") return end
             local peer = GetPeer(target_id)
             if peer then
@@ -503,11 +580,9 @@ if not _G.LunaCommandHooked then
                     url = plat_link
                 }
                 
-                -- SPARA TILL QUICK UNBAN MEMORY
                 LunaInvestigator.last_banned_id = acc_id_str
                 LunaInvestigator:save_db(db)
                 
-                -- VANILLA SYNC
                 if managers.ban_list and account_id_raw then
                     managers.ban_list:ban(account_id_raw, peer:name())
                     managers.savefile:save_setting(true)
@@ -529,7 +604,7 @@ if not _G.LunaCommandHooked then
                 managers.network:session():mark_peer_as_cheater(tonumber(target_id), "LunaHUD Manual Mark")
                 LunaInvestigator:announce("MARKED: " .. peer:name() .. " is now flagged as a Cheater.", true)
             else
-                LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
+                 LunaInvestigator:local_feedback("Peer " .. target_id .. " not found.")
             end
         end
 
@@ -569,7 +644,6 @@ if not _G.LunaCommandHooked then
             end
         end
 
-        -- [ KRASCHSÄKER VANILLA UNBAN ]
         ,["unban"] = function(msg)
             local t = string.sub(msg, 8)
             t = t and t:match("^%s*(.-)%s*$") or "" 
@@ -595,7 +669,6 @@ if not _G.LunaCommandHooked then
                     db[json_account_id] = nil
                     LunaInvestigator:save_db(db)
                     
-                    -- VANILLA SYNC: Skjut blint på både string och number för att undvika PD2-krascher
                     if managers.ban_list then
                         managers.ban_list:unban(json_account_id)
                         
@@ -610,7 +683,7 @@ if not _G.LunaCommandHooked then
                     LunaInvestigator:announce("Unbanned: " .. unbanned_name, false)
                     
                     if LunaInvestigator.last_banned_id == json_account_id then
-                        LunaInvestigator.last_banned_id = nil
+                         LunaInvestigator.last_banned_id = nil
                     end
                     
                     found = true
@@ -644,14 +717,14 @@ if not _G.LunaCommandHooked then
         end
     }
 
-    -- Aliases (Mapping synonyms)
+    -- Aliases
     luna_commands["exit"] = luna_commands["quit"]
+    luna_commands["q"] = luna_commands["quit"] -- NYTT ALIAS
     luna_commands["unstuck"] = luna_commands["spawn"]
     luna_commands["load"] = luna_commands["spawn"]
     luna_commands["s"] = luna_commands["spawn"]
     
     luna_commands["cheaters"] = luna_commands["kickcheck"]
-    
     luna_commands["players"] = luna_commands["list"]
     luna_commands["peers"] = luna_commands["list"]
     
@@ -661,7 +734,6 @@ if not _G.LunaCommandHooked then
     luna_commands["r"] = luna_commands["restart"]
     luna_commands["cheater"] = luna_commands["mark"]
     
-    -- Jailing aliases
     luna_commands["jail"] = luna_commands["arrest"]
     luna_commands["mute"] = luna_commands["arrest"]
 
@@ -684,4 +756,3 @@ if not _G.LunaCommandHooked then
         return orig_send_message(self, channel_id, sender, message)
     end
 end
--- [END_ID: INVESTIGATOR_V14.7_STABLE] --

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LunAlpha HUD - Manual</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-bg: #1e1e1e;
+            --text-color: #e0e0e0;
+            --luna-gold: #FFD700;
+            --luna-blue: #0088cc;
+            --danger: #ff4444;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+        }
+
+        /* Sidebar Navigation */
+        nav {
+            width: 250px;
+            background-color: var(--panel-bg);
+            padding: 20px;
+            height: 100vh;
+            position: fixed;
+            border-right: 2px solid var(--luna-gold);
+            overflow-y: auto;
+        }
+
+        nav h2 {
+            color: var(--luna-gold);
+            font-size: 1.2rem;
+            margin-top: 0;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        nav ul li {
+            margin-bottom: 10px;
+        }
+
+        nav a {
+            color: var(--text-color);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        nav a:hover {
+            color: var(--luna-gold);
+        }
+
+        /* Main Content */
+        main {
+            margin-left: 290px;
+            padding: 40px;
+            max-width: 900px;
+        }
+
+        h1 {
+            color: var(--luna-gold);
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--luna-blue);
+            margin-top: 40px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+
+        .cmd-block {
+            background-color: var(--panel-bg);
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            border-left: 4px solid #555;
+        }
+
+        .cmd-title {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: var(--luna-gold);
+            margin-bottom: 5px;
+        }
+
+        .cmd-alias {
+            font-size: 0.85rem;
+            color: #888;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        code {
+            font-family: 'Consolas', monospace;
+            background-color: #000;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #fff;
+        }
+
+        .alert {
+            background-color: rgba(255, 68, 68, 0.1);
+            border-left: 4px solid var(--danger);
+            padding: 10px;
+            margin: 20px 0;
+        }
+
+        .path-block {
+            background-color: #000;
+            padding: 10px;
+            font-family: monospace;
+            color: var(--luna-blue);
+            border: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <h2>Table of Contents</h2>
+        <ul>
+            <li><a href="#intro">Introduction</a></li>
+            <li><a href="#network">Network & Players</a></li>
+            <li><a href="#security">Security & Moderation</a></li>
+            <li><a href="#tools">Tools & Navigation</a></li>
+            <li><a href="#files">File Locations & Logs</a></li>
+        </ul>
+    </nav>
+
+    <main>
+        <h1 id="intro">LunAlpha HUD - Command Manual</h1>
+        <p>Welcome to the LunAlpha HUD manual. All commands are executed via the standard in-game chat. Note that commands starting with <code>!</code> are silent and will not be seen by other players unless specified.</p>
+        
+        <div class="alert">
+            <strong>Host Requirement:</strong> Commands that affect other players (like Kick, Ban, Arrest, Spawn) require you to be the Host of the lobby.
+        </div>
+
+        <h2 id="network">Network & Players</h2>
+        
+        <div class="cmd-block">
+            <div class="cmd-title">!list</div>
+            <div class="cmd-alias">Aliases: !peers, !players</div>
+            <p>Prints a local list of all active remote players and their Peer IDs. Use these IDs for targeted commands.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!info &lt;id&gt;</div>
+            <p>Performs a deep scan of a specific player and prints the results locally in your chat. Displays their equipped Perk Deck, total Skill Points, Accuracy stats, and any synchronized SuperBLT mods. Ignores empty or hidden data to keep your chat clean.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!debug &lt;id&gt;</div>
+            <p>Similar to <code>!info</code>, but focused on technical data. Highlights illegal skill point totals (over 120 pts) and displays their current SuperBLT version.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!mods &lt;id&gt;</div>
+            <div class="cmd-alias">Aliases: !m</div>
+            <p>Prints a list of the specified player's synchronized mods in your local chat.</p>
+        </div>
+
+        <h2 id="security">Security & Moderation (Host Only)</h2>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!kickcheck</div>
+            <div class="cmd-alias">Aliases: !cheaters</div>
+            <p>Automatically scans the lobby for players using blacklisted mods, DLC unlockers, aimbots, or illegitimate skill points. Will automatically kick flagged users.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!ssl</div>
+            <p>Executes a Deep Integrity Scan. Runs the kickcheck algorithm AND automatically generates a lobby snapshot log file (see <a href="#files">File Locations</a>).</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!kick &lt;id&gt;</div>
+            <div class="cmd-alias">Aliases: !k</div>
+            <p>Instantly kicks the specified player from the lobby.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!ban &lt;id&gt;</div>
+            <div class="cmd-alias">Aliases: !b</div>
+            <p>Kicks the player, adds them to the internal <strong>Luna Blacklist</strong>, and automatically syncs them to the Vanilla Payday 2 banlist. Stores their Steam/Epic profile URL.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!unban &lt;id&gt;</div>
+            <p>Removes a player from both the Luna Blacklist and the Vanilla banlist. <br><em>Tip: Typing <code>!unban</code> without an ID will automatically unban the last person you banned.</em></p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!arrest &lt;id&gt;</div>
+            <div class="cmd-alias">Aliases: !jail, !mute</div>
+            <p>Places the targeted player in handcuffs indefinitely. Useful for stopping griefers mid-heist without fully kicking them.</p>
+        </div>
+
+        <h2 id="tools">Tools & Navigation</h2>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!leave</div>
+            <p>Instantly aborts the current heist and returns you directly to the Main Menu. No confirmation screens.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!quit</div>
+            <div class="cmd-alias">Aliases: !q, !exit</div>
+            <p>Forcefully closes Payday 2 and returns to your desktop.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!log</div>
+            <p>Takes a comprehensive snapshot of the current lobby (Platform info, FBI URLs, Builds, Accuracy, Mods) and saves it as a permanent <code>.log</code> file on your computer.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!readyup</div>
+            <p>Locally identifies which players have not pressed "Ready" in the pre-planning screen, and publicly reminds them in the chat.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!spawn</div>
+            <div class="cmd-alias">Aliases: !s, !load, !unstuck</div>
+            <p>Forces the game to spawn all players currently stuck in the "waiting to join" phase. (Host only).</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!stats</div>
+            <p>Toggles the Quake-style Combat Stats Feed (Kills, Specials, Accuracy) on or off.</p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">!version</div>
+            <p>A public "handshake" command. When typed, any other LunAlpha HUD users in the lobby will automatically reply with their current version.</p>
+        </div>
+
+        <h2 id="files">File Locations & Logs</h2>
+        <p>LunAlpha HUD operates locally on your machine and generates evidence files for security purposes. Here is where you can find your data:</p>
+
+        <div class="cmd-block">
+            <div class="cmd-title">Lobby Snapshots (Logs)</div>
+            <p>When you run <code>!log</code> or <code>!ssl</code>, the HUD generates a detailed text file of the lobby. This is useful for reporting cheaters to server admins.</p>
+            <div class="path-block">PAYDAY 2\mods\LunAlpha_MinimalHUD\logs\</div>
+            <p><em>Files are named <code>LunaLog_YYYY-MM-DD.log</code></em></p>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">The Blacklist Database</div>
+            <p>When you use <code>!ban</code>, or when the auto-kicker catches a cheater, they are saved to a local JSON file. This file contains their name, platform URL, and the reason for the ban.</p>
+            <div class="path-block">PAYDAY 2\mods\LunAlpha_MinimalHUD\luna_blacklist.json</div>
+        </div>
+
+        <div class="cmd-block">
+            <div class="cmd-title">HUD Settings</div>
+            <p>Your toggles (Quiet Mode, Buffs, Stats, Crosshair) are saved in the standard SuperBLT save directory.</p>
+            <div class="path-block">PAYDAY 2\mods\saves\lunahud_settings.json</div>
+        </div>
+
+        <br><br><br>
+    </main>
+</body>
+</html>

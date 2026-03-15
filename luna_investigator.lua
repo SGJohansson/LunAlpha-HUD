@@ -435,25 +435,40 @@ if not _G.LunaCommandHooked then
             setup:quit()
         end
         
-        -- NY: LEAVE COMMAND
-        ,["leave"] = function(msg)
+        -- NY: LEAVE COMMAND (Fixad)
+	,["leave"] = function(msg)
             LunaInvestigator:local_feedback("Leaving to Main Menu...")
+            
+            -- 1. Bryt nätverksanslutningen rent
+            if managers.network:session() then
+                managers.network:session():send_to_peers("set_peer_left")
+                managers.network:queue_stop_network()
+            end
+            
+            -- 2. Städa upp matchmake och röstchatt
             if managers.network and managers.network.matchmake then
                 managers.network.matchmake:leave_game()
             end
-            setup:return_to_main_menu()
+            if managers.network and managers.network.voice_chat then
+                managers.network.voice_chat:destroy_voice()
+            end
+            
+            -- 3. Förhindra UI-softlock och ladda menyn
+            if managers.menu then
+                managers.menu:close_menu("menu_pause")
+                managers.menu:post_event("menu_exit")
+            end
+            
+            setup:load_start_menu()
         end
-        
--- NY: MANUAL VIA OVERLAY (ONLINE)
+
+	-- NY: MANUAL VIA OVERLAY (ONLINE)
         ,["readme"] = function(msg)
             if Steam and Steam:overlay_enabled() then
                 -- Omgår Steam Overlays problem med lokala filsökvägar och mellanslag.
-                -- Använd antingen GitHub-direktlänk eller din Netlify-domän.
-                local url = "https://htmlpreview.github.io/?https://github.com/SGJohansson/LunAlpha-HUD/blob/main/README.html"
+                -- Använder htmlpreview med korrekt branch (CMD)
+                local url = "https://htmlpreview.github.io/?https://github.com/SGJohansson/LunAlpha-HUD/blob/CMD/README.html"
                 
-                -- Om du laddar upp den till din hemsida istället, använd denna:
-                -- local url = "https://lunalpha-hud.netlify.app/README.html"
-
                 Steam:overlay_activate("url", url)
                 LunaInvestigator:local_feedback("Opening Online Manual...")
             else
@@ -461,7 +476,7 @@ if not _G.LunaCommandHooked then
             end
         end
 
-        ,["spawn"] = function(msg)
+	,["spawn"] = function(msg)
             if not Network:is_server() then LunaInvestigator:local_feedback("Error: Host only.") return end
             managers.network:session():spawn_players()
             LunaInvestigator:local_feedback("Forced spawn on all waiting players.")
